@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube AI Agent</title>
+    <style>
+        :root {
+            font-family: Inter, system-ui, Arial, sans-serif;
+            color: #eaf0ff;
+            background: #0b1020;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 28px 16px;
+        }
+
+        main {
+            max-width: 950px;
+            margin: auto;
+        }
+
+        header {
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(26px, 5vw, 38px);
+        }
+
+        p {
+            color: #aab6d3;
+            line-height: 1.6;
+        }
+
+        .card {
+            background: #131b30;
+            border: 1px solid #263452;
+            border-radius: 16px;
+            padding: 22px;
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            margin: 14px 0 7px;
+            font-weight: 600;
+        }
+
+        input,
+        select,
+        textarea,
+        button {
+            width: 100%;
+            font: inherit;
+            border-radius: 9px;
+            padding: 12px;
+        }
+
+        input,
+        select,
+        textarea {
+            color: #f4f7ff;
+            background: #0c1427;
+            border: 1px solid #354566;
+        }
+
+        textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        button {
+            margin-top: 18px;
+            border: 0;
+            background: #5877ff;
+            color: white;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: .55;
+            cursor: wait;
+        }
+
+        .muted {
+            color: #9aa9c8;
+            font-size: 14px;
+        }
+
+        .status {
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .result h3 {
+            color: #a9bbff;
+            margin-bottom: 6px;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            background: #0a1121;
+            border-radius: 10px;
+            padding: 14px;
+            line-height: 1.65;
+            color: #e2eaff;
+        }
+
+        .job {
+            border-top: 1px solid #293653;
+            padding: 12px 0;
+            overflow-wrap: anywhere;
+        }
+
+        .job button {
+            margin-top: 8px;
+            padding: 9px;
+        }
+
+        .error {
+            color: #ff9c9c;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 18px 12px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .card {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <header>
+            <h1>🎬 YouTube AI Agent</h1>
+            <p>Enter your idea. Generate a complete YouTube script and scene plan with Groq AI.</p>
+        </header>
+
+        <section class="card">
+            <h2>Create a video plan</h2>
+            <form id="videoForm">
+                <label for="prompt">Video topic or prompt</label>
+                <textarea id="prompt" minlength="5" maxlength="3000" required
+                    placeholder="Example: Explain AI agents for beginners in Hindi..."></textarea>
+
+                <div class="grid">
+                    <div>
+                        <label for="videoType">Video format</label>
+                        <select id="videoType">
+                            <option value="shorts">YouTube Shorts</option>
+                            <option value="long">Long video</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="duration">Duration (minutes)</label>
+                        <select id="duration">
+                            <option value="1">1 minute</option>
+                            <option value="2">2 minutes</option>
+                            <option value="3">3 minutes</option>
+                            <option value="5">5 minutes</option>
+                            <option value="8">8 minutes</option>
+                            <option value="10">10 minutes</option>
+                            <option value="15">15 minutes</option>
+                            <option value="20">20 minutes</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="language">Language</label>
+                        <select id="language">
+                            <option>Hindi</option>
+                            <option>Hinglish</option>
+                            <option>English</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="style">Visual style</label>
+                        <select id="style">
+                            <option>AI presenter/avatar</option>
+                            <option>Faceless documentary</option>
+                            <option>Cinematic AI visuals</option>
+                            <option>Educational explainer</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="muted">This phase creates the script and scene plan, not an MP4 video.</p>
+                <button id="submitBtn" type="submit">Generate Video Plan</button>
+            </form>
+        </section>
+
+        <section id="statusCard" class="card" hidden>
+            <h2>Generation status</h2>
+            <p id="statusText" class="status">Queued</p>
+            <p id="statusMessage" class="muted"></p>
+        </section>
+
+        <section id="resultCard" class="card result" hidden>
+            <h2>Generated result</h2>
+            <div id="resultContent"></div>
+        </section>
+
+        <section class="card">
+            <h2>Recent jobs</h2>
+            <button id="refreshBtn" type="button">Refresh jobs</button>
+            <div id="jobsList"></div>
+        </section>
+    </main>
+
+    <script>
+        const form = document.getElementById("videoForm");
+        const submitBtn = document.getElementById("submitBtn");
+        const statusCard = document.getElementById("statusCard");
+        const statusText = document.getElementById("statusText");
+        const statusMessage = document.getElementById("statusMessage");
+        const resultCard = document.getElementById("resultCard");
+        const resultContent = document.getElementById("resultContent");
+        const jobsList = document.getElementById("jobsList");
+
+        let activeJobId = null;
+        let pollTimer = null;
+
+        async function api(url, options = {}) {
+            const response = await fetch(url, options);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.detail || "Request failed");
+            }
+            return data;
+        }
+
+        function addText(parent, tag, text, className = "") {
+            const el = document.createElement(tag);
+            el.textContent = text ?? "";
+            if (className) el.className = className;
+            parent.appendChild(el);
+            return el;
+        }
+
+        function renderResult(result) {
+            resultContent.replaceChildren();
+
+            addText(resultContent, "h3", result.title);
+            addText(resultContent, "p", result.description);
+            addText(resultContent, "p",
+                `Audience: ${result.audience} | Total: ${result.total_duration_seconds} seconds`,
+                "muted");
+
+            addText(resultContent, "h3", "Opening hook");
+            addText(resultContent, "pre", result.hook);
+
+            addText(resultContent, "h3", "Complete script");
+            addText(resultContent, "pre", result.script);
+
+            addText(resultContent, "h3", "Scenes");
+            (result.scenes || []).forEach(scene => {
+                addText(resultContent, "h3",
+                    `Scene ${scene.scene_number} — ${scene.duration_seconds}s`);
+                addText(resultContent, "p", `Visual: ${scene.visual}`);
+                addText(resultContent, "p", `Narration: ${scene.narration}`);
+                addText(resultContent, "p",
+                    `On-screen text: ${scene.on_screen_text}`, "muted");
+            });
+
+            addText(resultContent, "h3", "Thumbnail prompt");
+            addText(resultContent, "pre", result.thumbnail_prompt);
+            addText(resultContent, "h3", "Tags");
+            addText(resultContent, "p", (result.tags || []).join(", "));
+
+            const downloadBtn = document.createElement("button");
+            downloadBtn.type = "button";
+            downloadBtn.textContent = "Download result as JSON";
+            downloadBtn.onclick = () => {
+                const blob = new Blob([JSON.stringify(result, null, 2)], {
+                    type: "application/json"
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "youtube-video-plan.json";
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+            resultContent.appendChild(downloadBtn);
+            resultCard.hidden = false;
+        }
+
+        async function pollJob(jobId) {
+            clearTimeout(pollTimer);
+            try {
+                const job = await api(`/api/jobs/${jobId}`);
+                statusCard.hidden = false;
+                statusText.textContent = job.status;
+                statusMessage.textContent = job.error || `Job ID: ${job.job_id}`;
+
+                if (job.status === "completed") {
+                    const data = await api(`/api/jobs/${jobId}/result`);
+                    renderResult(data.result);
+                    submitBtn.disabled = false;
+                    await refreshJobs();
+                    return;
+                }
+
+                if (job.status === "failed") {
+                    statusMessage.className = "error";
+                    submitBtn.disabled = false;
+                    await refreshJobs();
+                    return;
+                }
+
+                pollTimer = setTimeout(() => pollJob(jobId), 2000);
+            } catch (error) {
+                statusMessage.textContent = error.message;
+                submitBtn.disabled = false;
+            }
+        }
+
+        form.addEventListener("submit", async event => {
+            event.preventDefault();
+            clearTimeout(pollTimer);
+            submitBtn.disabled = true;
+            resultCard.hidden = true;
+            statusCard.hidden = false;
+            statusText.textContent = "Submitting";
+            statusMessage.textContent = "Sending your prompt to the backend...";
+
+            const payload = {
+                prompt: document.getElementById("prompt").value.trim(),
+                video_type: document.getElementById("videoType").value,
+                duration_minutes: Number(document.getElementById("duration").value),
+                language: document.getElementById("language").value,
+                style: document.getElementById("style").value
+            };
+
+            try {
+                const job = await api("/api/jobs", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                activeJobId = job.job_id;
+                await refreshJobs();
+                await pollJob(activeJobId);
+            } catch (error) {
+                statusText.textContent = "Error";
+                statusMessage.textContent = error.message;
+                submitBtn.disabled = false;
+            }
+        });
+
+        async function refreshJobs() {
+            try {
+                const data = await api("/api/jobs");
+                jobsList.replaceChildren();
+
+                if (!data.jobs.length) {
+                    addText(jobsList, "p", "No jobs yet.", "muted");
+                    return;
+                }
+
+                data.jobs.forEach(job => {
+                    const wrapper = document.createElement("div");
+                    wrapper.className = "job";
+                    addText(wrapper, "strong", job.prompt);
+                    addText(wrapper, "p",
+                        `${job.status.toUpperCase()} · ${job.video_type} · ${job.duration_minutes} min`,
+                        "muted");
+
+                    const viewBtn = document.createElement("button");
+                    viewBtn.type = "button";
+                    viewBtn.textContent = "View job";
+                    viewBtn.onclick = () => {
+                        activeJobId = job.job_id;
+                        statusCard.hidden = false;
+                        pollJob(job.job_id);
+                    };
+                    wrapper.appendChild(viewBtn);
+                    jobsList.appendChild(wrapper);
+                });
+            } catch (error) {
+                addText(jobsList, "p", error.message, "error");
+            }
+        }
+
+        document.getElementById("refreshBtn").addEventListener("click", refreshJobs);
+        refreshJobs();
+    </script>
+</body>
+
+</html>
